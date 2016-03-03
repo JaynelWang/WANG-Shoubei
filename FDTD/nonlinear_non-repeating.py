@@ -47,9 +47,9 @@ d1 = 4 / (3 * delta_r**2)
 e1 = 4 / (3 * delta_r**2)
 f1 = -1 / (12 * delta_r**2)
 g = -5 / (2 * delta_r**2) - 5 / (2 * delta_x**2) + 2 / (c**2 * delta_t**2) + \
-    3 * delta / (4 * c**4 * delta_t**3)
-h = -a - 23 * delta / (8 * c**4 * delta_t**3)
-k = delta / (8 * c**4 * delta_t**3)
+    3 * delta / (c**4 * delta_t**3)
+h = -a - 23 * delta / (2 * c**4 * delta_t**3)
+k = delta / (2 * c**4 * delta_t**3)
 l = beta / (2 * rou * c**4 * delta_t**2)
 
 def c2(r):
@@ -68,74 +68,52 @@ P = 801 * []          #acoustic pressure matrixes are stored in list P(length:8u
 P.append(P5)
 
 #generate matrix A
-column0 = [g,d1,c1] + 253 * [0]
-column1 = [e1,g,d1,c1] + 252 * [0]
-column254 = 252 * [0] + [f1,e1,g,d1]
-column255 = 253 * [0] + [f1,e1,g]
-column = [column0,column1]
-zero_up = 0
-zero_bottom = 251
-while zero_bottom >= 0:
-    temp = zero_up * [0] + [f1,e1,g,d1,c1] + zero_bottom * [0]
-    column.append(temp)
-    zero_up += 1
-    zero_bottom -= 1
-column.append(column254)
-column.append(column255)
-A = np.vstack((column[0],column[1]))
-for i in range(2,256):
-    A = np.vstack((A,column[i]))
-A = A.transpose((1,0))
+A = np.zeros([256,256])
+for i in range(256):
+    A[i,i] = g
+    if(i >= 1):
+        A[i-1,i] = e1
+    if(i >= 2):
+        A[i-2,i] = f1
+    if(i <= 254):
+        A[i+1,i] = d1
+    if(i <= 253):
+        A[i+2,i] = c1
 
 #generate matrix B
-column0 = [0,d2(1),c2(1)] + 253 * [0]
-column1 = [e2(2),0,d2(2),c2(2)] + 252 * [0]
-column254 = 252 * [0] + [f2(255),e2(255),0,d2(255)]
-column155 = 253 * [0] + [f2(256),e2(256),0]
-column = [column0,column1]
-zero_up = 0
-zero_bottom = 251
-while zero_bottom >= 0:
-    temp = zero_up * [0] + [f2(254-zero_bottom),e2(254-zero_bottom),0,d2(254-zero_bottom),c2(254-zero_bottom)] + zero_bottom * [0]
-    column.append(temp)
-    zero_up += 1
-    zero_bottom -= 1  
-column.append(column254)
-column.append(column255)
-B = np.vstack((column[0],column[1]))
-for i in range(2,256):
-    B = np.vstack((B,column[i]))
-B = B.transpose((1,0))
+B = np.zeros([256,256])
+for i in range(256):
+    if(i >= 1):
+        B[i-1,i] = e2(i+1)
+    if(i >= 2):
+        B[i-2,i] = f2(i+1)
+    if(i <= 254):
+        B[i+1,i] = d2(i+1)
+    if(i <= 253):
+        B[i+2,i] = c2(i+1)
 
 #generate matrix C
-row0 = [0,16*b,-b] + 510 * [0]
-row1 = [16*b,0,16*b,-b] + 509 * [0]
-row511 = 509 * [0] + [-b,16*b,0,16*b]
-row512 = 510 * [0] + [-b,16*b,0]
-row = [row0,row1]
-zero_left = 0
-zero_right = 508
-while zero_right >= 0:
-    temp = zero_left * [0] + [-b,16*b,0,16*b,-b] + zero_right * [0]
-    row.append(temp)
-    zero_left += 1
-    zero_right -= 1
-row.append(row511)
-row.append(row512)
-C = np.vstack((row[0],row[1]))
-for i in range(2,513):
-    C = np.vstack((C,row[i]))
+C = np.zeros([513,513])
+for i in range(513):
+    if(i >= 1):
+        C[i,i-1] = 16 * b 
+    if(i >= 2):
+        C[i,i-2] = -b
+    if(i <= 511):
+        C[i,i+1] = 16 * b
+    if(i <= 510):
+        C[i,i+2] = -b
 
 #generate matrix D
 def calculateD():
-    Pim_0 = P5[:,0] + alpha * delta_r
-    Pim_1 = P5[:,0] + 2 * alpha * delta_r
-    Pip_1 = P5[:,255] + alpha * delta_r
-    Pip_2 = P5[:,255] + 2 * alpha * delta_r
-    Pjm_1 = P5[0,:] + alpha * delta_x
-    Pjm_2 = P5[0,:] + 2 * alpha * delta_x
-    Pjp_1 = P5[512,:] + alpha * delta_x
-    Pjp_2 = P5[512,:] + 2 * alpha * delta_x
+    Pim_0 = P5[:,0] + (delta_r / (2*c*delta_t)) * (3*P5[:,0] - 4*P4[:,0] + P3[:,0])
+    Pim_1 = P5[:,0] + (delta_r / (c*delta_t)) * (3*P5[:,0] - 4*P4[:,0] + P3[:,0])
+    Pip_1 = P5[:,255] - (delta_r / (2*c*delta_t)) * (3*P5[:,255] - 4*P4[:,255] + P3[:,255])
+    Pip_2 = P5[:,255] - (delta_r / (c*delta_t)) * (3*P5[:,255] - 4*P4[:,255] + P3[:,255])
+    Pjm_1 = P5[0,:] + (delta_x / (2*c*delta_t)) * (3*P5[0,:] - 4*P4[0,:] + P3[0,:])
+    Pjm_2 = P5[0,:] + (delta_x / (c*delta_t)) * (3*P5[0,:] - 4*P4[0,:] + P3[0,:])
+    Pjp_1 = P5[512,:] - (delta_x / (2*c*delta_t)) * (3*P5[512,:] - 4*P4[512,:] + P3[512,:])
+    Pjp_2 = P5[512,:] - (delta_x / (c*delta_t)) * (3*P5[512,:] - 4*P4[512,:] + P3[512,:])
 
     D1 = (e1 + e2(1)) * np.column_stack((Pim_0,np.zeros((513,255))))
     D2 = (f1 + f2(1)) * np.column_stack((Pim_1,np.zeros((513,255))))
